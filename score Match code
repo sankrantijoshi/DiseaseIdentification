@@ -1,0 +1,95 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using MySql.Data;
+using MySql.Data.MySqlClient;
+using System.Threading.Tasks;
+
+namespace Final_Form
+{
+    class ScoreStringMatch
+    {
+            public static void shortSequence(string main, string sub, List<int> Score)
+            {
+                int n = main.Length;
+                int m = sub.Length;
+
+                int[,] d = new int[n + 1, m + 1];
+
+                // Step 1
+                if (n == 0)
+                {
+                    Score.Add(m);
+                }
+
+                if (m == 0)
+                {
+                    Score.Add(n);
+                }
+
+                // Step 2
+                for (int i = 0; i <= n; d[i, 0] = i++)
+                {
+                }
+
+                for (int j = 0; j <= m; d[0, j] = j++)
+                {
+                }
+
+                // Step 3
+                for (int i = 1; i <= n; i++)
+                {
+                    //Step 4
+                    for (int j = 1; j <= m; j++)
+                    {
+                        // Step 5
+                        int cost = (sub[j - 1] == main[i - 1]) ? 0 : 1;
+
+                        // Step 6
+                        d[i, j] = Math.Min(
+                            Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1),
+                            d[i - 1, j - 1] + cost);
+                    }
+                }
+                int diff = Math.Abs(n - m);
+                diff = d[n, m] - diff;
+                Score.Add(diff);
+            }
+          
+            public static void getMin(List<int> score, List<int> Index)
+            {
+                 int min = score[0];
+                Index.Add(0);
+                for (int i = 1; i < score.Count; i++)
+                {
+                    if (score[i] < min)
+                    {
+                        min = score[i];
+                        Index.Clear();
+                        Index.Add(i);
+                    }
+                    else if (score[i] == min)
+                        Index.Add(i);
+                }
+
+            }
+            public static void getMax(List<int> score, List<int> Index)
+            {
+                    int max = 0;
+                    Index.Add(0);
+
+                    for (int i = 0; i < score.Count; i++)
+                    {
+                        if (score[i] > max)
+                        {
+                            max = score[i];
+                            Index.Clear();
+                            Index.Add(i);
+                        }
+                        else if (score[i] == max)
+                            Index.Add(i);
+                    }
+            }
+    }
+}
