@@ -1,0 +1,307 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using MySql.Data;
+using MySql.Data.MySqlClient;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Final_Form
+{
+    public partial class Form1 : Form
+    {
+        MySqlConnection Conn = new MySqlConnection("server=localhost;User Id=root;Password = 6344234345;Persist Security Info=True;database=test");
+        MySqlCommand Cmd;
+        MySqlDataReader reader;
+        string query;
+        List<string> diseaseData = new List<string>();
+        List<int> SeqID = new List<int>();
+        List<int> Score = new List<int>();
+        List<int> Index = new List<int>();
+        List<string> DiseaseID = new List<string>();
+        int DiseaseScoring = 0;
+        Dictionary<string, int> diseaseDetail = new Dictionary<string, int>();
+        List<int> SympID = new List<int>();
+    
+        public Form1()
+        {
+            InitializeComponent();
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            
+        }
+
+        private void checkBox1_CheckedChanged(object sender, EventArgs e)
+        {
+            string DataCompare;
+            if (DiseasedData.Text == "")
+            {
+                MessageBox.Show("Please Enter Data");
+                checkBox1.Visible = false;
+            }
+            else
+            {
+                Conn.Open();
+                DiseasedData.ReadOnly = true;
+                DataCompare = DiseasedData.Text.ToLowerInvariant();
+                query = "Select DiseaseSeqID, Data from diseasedata";
+                Cmd = new MySqlCommand(query, Conn);
+                reader = Cmd.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    diseaseData.Add(reader["Data"].ToString());
+                    SeqID.Add(Convert.ToInt32(reader["DiseaseSeqID"]));
+                }
+                reader.Close();
+                Conn.Close();
+                for (int i = 0; i < diseaseData.Count; i++)
+                {
+                    
+                        ScoreStringMatch.shortSequence(diseaseData[i], DataCompare, Score);
+                }
+                ScoreStringMatch.getMin(Score, Index);
+
+                Conn.Open();
+                if (Index.Count == 1)
+                {
+                    query = "select DiseaseID, Information from diseasedata where DiseaseSeqID = '" + SeqID[Index[0]] + "'";
+                    Cmd = new MySqlCommand(query, Conn);
+                    reader = Cmd.ExecuteReader();
+
+                    while (reader.Read())
+                    {
+                        if (reader["Information"].ToString() == "No risk")
+                        {
+
+                            MessageBox.Show("There is no valid match of data. Please proceed to symptoms for results");
+                            break;
+                        }
+                        else
+                        {
+                                DiseaseID.Add(reader["DiseaseID"].ToString());
+                                if(diseaseDetail.Keys.Contains(reader["DiseaseID"].ToString()) == false)
+                                {
+                                    
+                                    diseaseDetail.Add(reader["DiseaseID"].ToString(), 10);
+                                }
+                                else if (diseaseDetail.Keys.Contains(reader["DiseaseID"].ToString()) == true)
+                                {
+                                    foreach (KeyValuePair<string, int> dat in diseaseDetail)
+                                    { 
+                                        if(dat.Key == reader["DiseaseID"].ToString())
+                                        {
+                                            DiseaseScoring = dat.Value;
+                                            DiseaseScoring = DiseaseScoring + 10;
+                                            diseaseDetail[reader["DiseaseID"].ToString()] = DiseaseScoring;
+                                            DiseaseScoring = 0;
+                                            break;
+                                        }
+                                    }
+
+                                }
+                        }
+                    }
+                    reader.Close();
+                }
+                else
+                {
+                    for (int i = 0; i < Index.Count; i++)
+                    {
+                        query = "select DiseaseID, Information from diseasedata where DiseaseSeqID = '" + SeqID[Index[i]] + "'";
+                        Cmd = new MySqlCommand(query, Conn);
+                        reader = Cmd.ExecuteReader();
+                        while (reader.Read())
+                        {
+                            if (reader["Information"].ToString() == "No risk")
+                            {
+
+                                MessageBox.Show("There is no valid Match. The disease might not be present. Result can be provided based on symptoms");
+                                break;
+                            }
+                            else
+                            {
+                                DiseaseID.Add(reader["DiseaseID"].ToString());
+                                if (diseaseDetail.Keys.Contains(reader["DiseaseID"].ToString()) == false)
+                                {
+
+                                    diseaseDetail.Add(reader["DiseaseID"].ToString(), 10);
+                                }
+                                else if (diseaseDetail.Keys.Contains(reader["DiseaseID"].ToString()) == true)
+                                {
+                                    foreach (KeyValuePair<string, int> dat in diseaseDetail)
+                                    {
+                                        if (dat.Key == reader["DiseaseID"].ToString())
+                                        {
+                                            DiseaseScoring = dat.Value;
+                                            DiseaseScoring = DiseaseScoring + 10;
+                                            diseaseDetail[reader["DiseaseID"].ToString()] = DiseaseScoring;;
+                                            DiseaseScoring = 0;
+                                            break;
+                                        }
+                                    }
+
+                                }
+
+                            }
+                        }
+                        reader.Close();
+                    }
+                }
+                for (int i = 0; i < DiseaseID.Count; i++)
+                {
+                    query = "Select Distinct Name from symptom_record where DiseaseID like '%" + DiseaseID[i] +"%'";
+                    Cmd = new MySqlCommand(query, Conn);
+                    reader = Cmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        Symptoms.Items.Add(reader["Name"].ToString());
+                    }
+                    reader.Close();
+                }
+                MessageBox.Show("Data Added. Please Proceed");
+                Conn.Close();
+
+            }
+
+        }
+
+        private void Symptoms_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if ((checkBox3.Checked == true) && (checkBox2.Checked == true))
+            {
+                MessageBox.Show("You Have confirmed your selection.");
+            }
+            else
+            {
+                SymtomsSelected.AppendText(Symptoms.SelectedItem.ToString());
+                SymtomsSelected.AppendText("\n");
+                DiseaseID.Clear();
+                Conn.Open();
+                query = "Select DiseaseID, Score, Symptom_ID from symptom_record Where Name = '" + Symptoms.SelectedItem + "'";
+                Cmd = new MySqlCommand(query, Conn);
+                reader = Cmd.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    SympID.Add(Convert.ToInt32(reader["Symptom_ID"]));
+                    
+                    foreach (KeyValuePair<string, int> dat in diseaseDetail)
+                    {
+                        if (dat.Key == reader["DiseaseID"].ToString())
+                        {
+                            DiseaseScoring = dat.Value;
+                            DiseaseScoring = DiseaseScoring + Convert.ToInt32(reader["Score"]);
+                            diseaseDetail[reader["DiseaseID"].ToString()] = DiseaseScoring;
+                            DiseaseScoring = 0;
+                            break;
+                        }
+                    }
+                    
+                }
+                reader.Close();
+                for (int i = 0; i < SympID.Count; i++)
+                {
+                    query = "Select DiseaseName from symptoms where Name like '%" + SympID[i] + "%'";
+                    Cmd = new MySqlCommand(query, Conn);
+                    reader = Cmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        if (DiseaseDetected.Text.Contains(reader["DiseaseName"].ToString()))
+                        {
+
+                        }
+                        else
+                        {
+                            DiseaseDetected.AppendText(reader["DiseaseName"].ToString());
+                            DiseaseDetected.AppendText("\n");
+                        }
+                    }
+                    reader.Close();
+                }
+                Conn.Close();
+            }
+        }
+
+        private void checkBox3_CheckedChanged(object sender, EventArgs e)
+        {
+            if (checkBox3.Checked == true)
+            {
+                diseaseData.Clear();
+                diseaseDetail.Clear();
+                SymtomsSelected.Clear();
+                DiseaseDetected.Clear();
+                DiseasedData.Clear();
+                checkBox1.Checked = false;
+                checkBox1.Visible = true;
+                checkBox2.Checked = false;
+                
+            }
+        }
+
+        private void checkBox2_CheckedChanged(object sender, EventArgs e)
+        {
+            if (SymtomsSelected.Text  == "")
+            {
+                MessageBox.Show("Please select symptoms first");
+            }
+        }
+
+        private void Proceed_Click(object sender, EventArgs e)
+        {
+            if (checkBox1.Checked == true && checkBox2.Checked == true)
+            {
+                DiseaseID.Clear();
+                Score.Clear();
+                Index.Clear();
+                foreach(KeyValuePair <string, int> dat in diseaseDetail)
+                {
+                   DiseaseID.Add(dat.Key);
+                   Score.Add(dat.Value);
+                }
+                ScoreStringMatch.getMax(Score, Index);
+                Conn.Open();
+                if (Index.Count == 1)
+                {
+                    query = "select DiseaseName from disease where DiseaseID = '" + DiseaseID[Index[0]] + "'";
+                    Cmd = new MySqlCommand(query, Conn);
+                    reader = Cmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        Match.AppendText(reader["DiseaseName"].ToString() + " - " + Score[Index[0]].ToString() + "%");
+                        break;
+                    }
+                    reader.Close();
+                }
+                else
+                {
+                    for(int i = 0; i < Index.Count; i++)
+                    {
+                        query = "select DiseaseName from disease where DiseaseID = '" + DiseaseID[Index[i]] + "'";
+                        Cmd = new MySqlCommand(query, Conn);
+                        reader = Cmd.ExecuteReader();
+                        while (reader.Read())
+                        {
+                            Match.AppendText(reader["DiseaseName"].ToString() + " - " + Score[Index[i]].ToString() + "%");
+                            Match.AppendText("\n");
+                            break;
+                        }
+                        reader.Close();
+                    }
+                }
+                Conn.Close();
+            }
+            else
+            {
+                MessageBox.Show("Please confirm the selection first");
+            }
+        }       
+    }
+}
